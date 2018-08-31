@@ -1,3 +1,5 @@
+### new version
+
 ndim<-10
 A<-matrix(runif(ndim^2)*2-1,ncol=ndim) 
 Sigma<-t(A)%*%A
@@ -28,10 +30,11 @@ matplot(mumatrix,type="l")
 ## LARS ##
 ##########
 
+set.seed(5000)
 ndim<-10
 nobs<-30
 beta_truth<-rep(0,ndim)
-beta_truth[sample(1:ndim,5)]<-1:5
+beta_truth[sample(1:ndim,6)]<-sample(c(-1,1),6,replace=TRUE)*1:6
 X<-matrix(runif(nobs*ndim),nobs,ndim)
 y<-X%*%beta_truth+rnorm(nobs,0,0.5)
 
@@ -48,18 +51,24 @@ beta_path<-matrix(NA,ndim,ndim)
 muhat<-rep(0,nobs)
 # empty active set
 active_set<-rep(FALSE,ndim)
+# all-zero sign set
+sign_set<-rep(0,ndim)
 
-## First step
-# correlation vector
-cc<-t(XX)%*%(yy-muhat)
-# active set is initialized using the largest correlation
-active_set[which.max(abs(cc))]<-TRUE
 
 for(tempidx in 1:(ndim-1)){
+  
+  ## First step
+  # correlation vector
+  cc<-t(XX)%*%(yy-muhat)
+  # active set is initialized using the largest correlation
+  active_set[which.max(abs(cc))]<-TRUE
+  # update sign set
+  sign_set<-sign(cc)
+  
 
   # Formula (2.4-2.7) in Efron et al (2004)
   one<-rep(1,sum(active_set))
-  X_A<-XX[,active_set]
+  X_A<-sweep(as.matrix(XX[,active_set]),2,sign_set[active_set],"*")
   G_A<-t(X_A)%*%X_A
   a_A<-sqrt(t(one)%*%solve(G_A,one))
   w_A<-solve(G_A,one)%*%a_A
@@ -67,7 +76,7 @@ for(tempidx in 1:(ndim-1)){
   # u_A is the direction of next step
   
   # Formula (2.11)
-  aaa<-t(X)%*%u_A
+  aaa<-t(XX)%*%u_A
   
   # Formula (2.13): length of next step
   vneg<-((max(abs(cc))-as.vector(cc))/(as.vector(a_A)-aaa))
@@ -82,9 +91,9 @@ for(tempidx in 1:(ndim-1)){
   # update muhat
   muhat<-muhat+gamma_length*u_A
   
-  show(muhat)
   beta_path[,tempidx]<-round(solve(t(XX)%*%XX,t(XX)%*%muhat),15)
 }
 
-beta_path
+matplot(apply(abs(beta_path),2,sum),t(beta_path),type='l')
+beta_path[,ndim]<-c(solve(t(XX)%*%XX,t(XX)%*%yy))
 matplot(apply(abs(beta_path),2,sum),t(beta_path),type='l')
